@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 
 const Login = () => {
@@ -9,13 +9,41 @@ const Login = () => {
     const { login } = useSocket();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        const mockUsername = email.split('@')[0];
-        const isPremium = email.includes('premium');
-        login(mockUsername, 'Unknown', [], isPremium, 'GLOBAL');
-        navigate('/chat');
+        setError('');
+        setLoading(true);
+
+        try {
+            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const response = await fetch(`${serverUrl}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Login failed');
+            }
+
+            // Store token and user data
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            // Login to socket with user data
+            login(data.user.username, data.user.country, data.user.interests, data.user.isPremium, 'GLOBAL');
+
+            navigate('/chat');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -31,6 +59,13 @@ const Login = () => {
             >
                 <h2 className="text-3xl font-bold text-white mb-6 text-center">Welcome Back</h2>
 
+                {error && (
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-2 text-red-400">
+                        <AlertCircle className="w-5 h-5" />
+                        <span className="text-sm">{error}</span>
+                    </div>
+                )}
+
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
@@ -43,6 +78,7 @@ const Login = () => {
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                 placeholder="you@example.com"
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -58,10 +94,11 @@ const Login = () => {
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                 placeholder="••••••••"
                                 required
+                                disabled={loading}
                             />
                         </div>
                         <div className="flex justify-end mt-2">
-                            <Link to="/forgot-password" class="text-xs text-primary hover:text-primary/80 transition-colors">
+                            <Link to="/forgot-password" className="text-xs text-primary hover:text-primary/80 transition-colors">
                                 Forgot Password?
                             </Link>
                         </div>
@@ -69,9 +106,10 @@ const Login = () => {
 
                     <button
                         type="submit"
-                        className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/25 transition-all"
+                        disabled={loading}
+                        className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Log In
+                        {loading ? 'Logging in...' : 'Log In'}
                     </button>
                 </form>
 

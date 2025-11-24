@@ -3,10 +3,25 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// MongoDB Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/introvert';
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Routes
+app.use('/api/auth', authRoutes);
+
+app.get('/', (req, res) => {
+    res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
+});
 
 app.post('/api/forgot-password', (req, res) => {
     const { email } = req.body;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 
 const Signup = () => {
@@ -10,13 +10,41 @@ const Signup = () => {
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSignup = (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
-        // Mock Signup Logic
-        // Just log them in as a new user
-        login(username, 'Unknown', [], false, 'GLOBAL');
-        navigate('/chat');
+        setError('');
+        setLoading(true);
+
+        try {
+            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const response = await fetch(`${serverUrl}/api/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Registration failed');
+            }
+
+            // Store token and user data
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            // Login to socket with user data
+            login(data.user.username, data.user.country, data.user.interests, data.user.isPremium, 'GLOBAL');
+
+            navigate('/chat');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -32,6 +60,13 @@ const Signup = () => {
             >
                 <h2 className="text-3xl font-bold text-white mb-6 text-center">Create Account</h2>
 
+                {error && (
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-2 text-red-400">
+                        <AlertCircle className="w-5 h-5" />
+                        <span className="text-sm">{error}</span>
+                    </div>
+                )}
+
                 <form onSubmit={handleSignup} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-2">Username</label>
@@ -44,6 +79,9 @@ const Signup = () => {
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                 placeholder="CoolUser123"
                                 required
+                                minLength={3}
+                                maxLength={30}
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -59,6 +97,7 @@ const Signup = () => {
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                 placeholder="you@example.com"
                                 required
+                                disabled={loading}
                             />
                         </div>
                     </div>
@@ -74,15 +113,19 @@ const Signup = () => {
                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                 placeholder="••••••••"
                                 required
+                                minLength={6}
+                                disabled={loading}
                             />
                         </div>
+                        <p className="text-xs text-slate-500 mt-1">Minimum 6 characters</p>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full bg-secondary hover:bg-secondary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-secondary/25 transition-all"
+                        disabled={loading}
+                        className="w-full bg-secondary hover:bg-secondary/90 text-white font-bold py-4 rounded-xl shadow-lg shadow-secondary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Sign Up
+                        {loading ? 'Creating account...' : 'Sign Up'}
                     </button>
                 </form>
 
