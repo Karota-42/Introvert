@@ -15,8 +15,10 @@ export const SocketProvider = ({ children }) => {
     useEffect(() => {
         // Connect to backend
         // In dev, Vite proxies /socket.io to localhost:3001
-        // In prod, it should point to the server URL
-        const newSocket = io('/', {
+        // In prod, we use the VITE_SERVER_URL env var, or default to relative path if served from same origin
+        const serverUrl = import.meta.env.VITE_SERVER_URL || '/';
+
+        const newSocket = io(serverUrl, {
             transports: ['websocket'],
             autoConnect: true
         });
