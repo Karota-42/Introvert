@@ -25,6 +25,23 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    subscriptionTier: {
+        type: String,
+        enum: ['free', 'starter', 'global', 'elite'],
+        default: 'free'
+    },
+    coins: {
+        type: Number,
+        default: 0
+    },
+    gender: {
+        type: String,
+        enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+        default: 'prefer_not_to_say'
+    },
+    subscriptionExpiresAt: {
+        type: Date
+    },
     country: {
         type: String,
         default: 'Unknown'

@@ -7,6 +7,7 @@ import Welcome from './pages/Welcome';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
+import PremiumPage from './pages/PremiumPage';
 
 const ProtectedRoute = ({ children }) => {
     const { user } = useSocket();
@@ -27,6 +28,7 @@ const AppRoutes = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/premium" element={<PremiumPage />} />
             <Route
                 path="/chat"
                 element={

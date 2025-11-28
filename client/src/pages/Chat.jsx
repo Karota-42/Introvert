@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, MoreVertical, Flag, UserPlus, RefreshCw } from 'lucide-react';
+import { Send, X, MoreVertical, Flag, UserPlus, RefreshCw, Coins, Crown } from 'lucide-react';
 import Avatar from '../components/Avatar';
+import CoinStore from '../components/CoinStore';
+import { Link } from 'react-router-dom';
 
 const Chat = () => {
     const { socket, user } = useSocket();
@@ -10,6 +12,7 @@ const Chat = () => {
     const [inputText, setInputText] = useState('');
     const [partner, setPartner] = useState(null);
     const [status, setStatus] = useState('SEARCHING'); // SEARCHING, CHATTING, DISCONNECTED
+    const [showCoinStore, setShowCoinStore] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -74,6 +77,8 @@ const Chat = () => {
 
     return (
         <div className="h-screen bg-dark flex flex-col relative overflow-hidden">
+            {showCoinStore && <CoinStore onClose={() => setShowCoinStore(false)} />}
+
             {/* Header */}
             <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between z-20">
                 <div className="flex items-center space-x-3">
@@ -97,6 +102,19 @@ const Chat = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
+                    <div className="hidden md:flex items-center mr-4 bg-slate-800 rounded-full px-3 py-1 border border-slate-700">
+                        <Coins className="w-4 h-4 text-yellow-500 mr-2" />
+                        <span className="text-yellow-500 font-bold mr-2">{user?.coins || 0}</span>
+                        <button onClick={() => setShowCoinStore(true)} className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded hover:bg-yellow-500/30 transition-colors">
+                            +
+                        </button>
+                    </div>
+
+                    <Link to="/premium" className="p-2 text-slate-400 hover:text-yellow-500 transition-colors relative group" title="Premium">
+                        <Crown className={`w-5 h-5 ${user?.isPremium ? 'text-yellow-500' : ''}`} />
+                        {!user?.isPremium && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>}
+                    </Link>
+
                     {user?.isPremium && (
                         <button className="p-2 text-slate-400 hover:text-yellow-500 transition-colors" title="Add Friend">
                             <UserPlus className="w-5 h-5" />
@@ -146,8 +164,8 @@ const Chat = () => {
                         >
                             <div
                                 className={`max-w-[80%] px-4 py-3 rounded-2xl shadow-sm ${msg.isSelf
-                                        ? 'bg-gradient-to-br from-primary to-indigo-600 text-white rounded-br-none'
-                                        : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
+                                    ? 'bg-gradient-to-br from-primary to-indigo-600 text-white rounded-br-none'
+                                    : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
                                     }`}
                             >
                                 <p>{msg.text}</p>

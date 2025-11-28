@@ -11,6 +11,8 @@
         "start": "npx serve dist -s -p $PORT"
     },
     "dependencies": {
+        "@stripe/react-stripe-js": "^5.4.1",
+        "@stripe/stripe-js": "^8.5.3",
         "clsx": "^2.0.0",
         "framer-motion": "^10.16.4",
         "lucide-react": "^0.292.0",

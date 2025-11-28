@@ -5,9 +5,25 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/auth');
+const monetizationRoutes = require('./routes/monetization');
+// const stripeRoutes = require('./routes/stripe'); // Disabled for now
 
 const app = express();
 app.use(cors());
+
+// Stripe webhook needs raw body, so we mount it before express.json()
+// However, since we defined express.raw() inside the router for that specific route, 
+// we can mount the router here, but we need to be careful.
+// Best practice: Mount webhook route separately if possible, or ensure express.json() doesn't consume it.
+// The stripe.js router uses `express.raw({ type: 'application/json' })` on the webhook route.
+// But if `app.use(express.json())` is global, it might interfere.
+// Let's move `app.use('/api/stripe', stripeRoutes)` BEFORE `app.use(express.json())` just to be safe, 
+// OR use a specific path that excludes json parsing.
+
+// Actually, let's just mount it. If express.json() is already used, we might need to modify server.js structure.
+// Let's look at the file again.
+// app.use('/api/stripe', stripeRoutes); // Disabled for now (Mock payments only)
+
 app.use(express.json());
 
 // MongoDB Connection
@@ -18,6 +34,7 @@ mongoose.connect(MONGODB_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/monetization', monetizationRoutes);
 
 app.get('/', (req, res) => {
     res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
@@ -57,9 +74,12 @@ io.on('connection', (socket) => {
             id: socket.id,
             username: data.username || 'Anonymous',
             isPremium: data.isPremium || false,
+            subscriptionTier: data.subscriptionTier || 'free',
             country: data.country || 'Unknown',
+            gender: data.gender || 'prefer_not_to_say',
             interests: data.interests || [],
-            targetCountry: data.targetCountry || null, // For premium: specific country or 'GLOBAL'
+            targetCountry: data.targetCountry || 'GLOBAL', // Default to GLOBAL
+            targetGender: data.targetGender || 'ANY',
             partnerId: null,
             state: 'IDLE' // IDLE, SEARCHING, CHATTING
         };
@@ -70,48 +90,36 @@ io.on('connection', (socket) => {
     // Helper to check compatibility
     const checkCompatibility = (user1, user2) => {
         // 1. Country Matching
-        // User1's requirement for User2
-        let u1MatchesU2 = false;
+        let u1MatchesU2 = true;
+        let u2MatchesU1 = true;
+
+        // User 1 Requirements
         if (user1.isPremium && user1.targetCountry && user1.targetCountry !== 'GLOBAL') {
-            u1MatchesU2 = (user2.country === user1.targetCountry);
-        } else if (user1.isPremium && user1.targetCountry === 'GLOBAL') {
-            u1MatchesU2 = true;
+            // Premium user requesting specific country
+            if (user2.country !== user1.targetCountry) u1MatchesU2 = false;
         } else {
-            // Free user: Must be same country
-            u1MatchesU2 = (user1.country === user2.country);
+            // Free user or Global Premium
+            // Free users match globally by default (as per "Country switch = Premium")
+            // So we don't restrict them to their own country unless that's the desired default.
+            // Assuming "Random Global" is the default for free users.
         }
 
-        // User2's requirement for User1
-        let u2MatchesU1 = false;
+        // User 2 Requirements
         if (user2.isPremium && user2.targetCountry && user2.targetCountry !== 'GLOBAL') {
-            u2MatchesU1 = (user1.country === user2.targetCountry);
-        } else if (user2.isPremium && user2.targetCountry === 'GLOBAL') {
-            u2MatchesU1 = true;
-        } else {
-            // Free user: Must be same country (or if User1 is Premium and "visiting" virtually?)
-            // Let's allow Premium users to match Free users if the Premium user targets the Free user's country.
-            // But strictly speaking, if User2 is Free, they expect User1 to be from same country.
-            // We'll treat Premium's targetCountry as effective location for this check if we want to allow it.
-            // For now, strict check:
-            u2MatchesU1 = (user2.country === user1.country);
-
-            // Exception: If User1 is Premium and targets User2's country, we allow it?
-            // Let's say YES, Premium users override the location check for the other person?
-            // Or simpler:
-            if (user1.isPremium && user1.targetCountry === user2.country) {
-                u2MatchesU1 = true;
-            }
+            if (user1.country !== user2.targetCountry) u2MatchesU1 = false;
         }
 
-        if (!u1MatchesU2 || !u2MatchesU1) return false;
+        // 2. Gender Matching (Elite Tier only)
+        // Note: We need to pass gender in login data to support this fully.
+        // Assuming user object has gender and targetGender if Elite.
+        if (user1.subscriptionTier === 'elite' && user1.targetGender && user1.targetGender !== 'ANY') {
+            if (user2.gender !== user1.targetGender) u1MatchesU2 = false;
+        }
+        if (user2.subscriptionTier === 'elite' && user2.targetGender && user2.targetGender !== 'ANY') {
+            if (user1.gender !== user2.targetGender) u2MatchesU1 = false;
+        }
 
-        // 2. Interest Matching (Optional boost, not strict filter for MVP unless specified)
-        // "Match with ... Same preferred interests (if available)"
-        // We won't block on interests, but we could prioritize.
-        // For this implementation, we just return true if location matches.
-        // We can add a score later.
-
-        return true;
+        return u1MatchesU2 && u2MatchesU1;
     };
 
     // Start searching for a match
